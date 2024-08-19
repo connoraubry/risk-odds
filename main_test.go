@@ -1,8 +1,10 @@
 package main
 
 import (
+	"log"
 	"math/rand"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -78,5 +80,84 @@ func TestParsePath(t *testing.T) {
 		if !reflect.DeepEqual(output, test.Output) {
 			t.Errorf("Test %v not successful. Output %v != %v", idx, output, test.Output)
 		}
+	}
+}
+
+func BenchmarkSortReverse(b *testing.B) {
+
+	x := 3
+
+	for i := 0; i < b.N; i++ {
+
+		var intSlice []int
+		for j := 0; j < x; j++ {
+			intSlice = append(intSlice, rand.Intn(6)+1)
+		}
+		slices.Sort(intSlice)
+		slices.Reverse(intSlice)
+	}
+}
+
+func BenchmarkSortFunction(b *testing.B) {
+
+	x := 3
+
+	for i := 0; i < b.N; i++ {
+
+		var intSlice []int
+		for j := 0; j < x; j++ {
+			intSlice = append(intSlice, rand.Intn(6)+1)
+		}
+		slices.SortFunc(intSlice, func(a, b int) int {
+			if a > b {
+				return -1
+			}
+			return 1
+		})
+	}
+}
+
+func TestAttackFast(t *testing.T) {
+	d_results := make(map[int]int)
+	total := 100000
+	for i := 0; i < total; i++ {
+		new_a, new_d := attack_fast(3, 2)
+		if new_a+new_d != 3 {
+			log.Fatalf("attack_fast(3, 2) gave extra units back")
+		}
+		d_results[new_d] += 1
+	}
+
+	var resultRange = []struct {
+		Low  float64
+		High float64
+	}{
+		{Low: 37, High: 37.4},
+		{Low: 33, High: 34},
+		{Low: 28.8, High: 29.5},
+	}
+
+	for idx, expected := range resultRange {
+		actual := 100.0 * (float64(d_results[idx]) / float64(total))
+
+		if actual < expected.Low || actual > expected.High {
+			t.Fatalf("Result %v not in range [%v - %v]", actual, expected.Low, expected.High)
+		}
+	}
+}
+
+func BenchmarkAttack(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a_val := rand.Intn(3) + 1
+		d_val := rand.Intn(2) + 1
+		attack(a_val, d_val, roll_dice)
+	}
+}
+
+func BenchmarkFastAttack(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a_val := rand.Intn(3) + 1
+		d_val := rand.Intn(2) + 1
+		attack_fast(a_val, d_val)
 	}
 }

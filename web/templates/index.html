@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+
+    <title>Risk Campaign Calculator</title>
+
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css" />
+
+    <script src="/static/js/htmx.min.js"></script>
+
+    <meta property="og:title" content="Risk Calculator">
+    <!-- <meta property="og:image" content="img/path"> -->
+  </head>
+  <body>
+    <header class="text-center">
+      <h1>Risk Calculator</h1>
+    </header>
+    <section>
+      <div> 
+        <form autocomplete="off" name="calcForm" hx-post="/submit" hx-target="#result">
+          <!-- <label for="title">Calculator</label><br> -->
+
+          <label for="attack">Attacking Strength</label><br>
+          <input type="text" id="attack" name="attack"><br>
+          <label for="path">Path of units to attack</label><br>
+          <input type="text" id="path" name="path"><br>
+
+          <input type="submit" id="submit" name="submit">
+        </form>
+        <div id="result">
+
+        </div>
+      </div>
+    </section>
+    <footer>
+    </footer>
+  </body>
+</html>
