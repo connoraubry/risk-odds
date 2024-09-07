@@ -16,19 +16,19 @@
   </head>
   <body>
     <header class="text-center">
-      <h1>Risk Calculator</h1>
+      <h1>Risk Calculator -- Sweep</h1>
       <nav>
         <a href="/">Main</a>
         <a href="/sweep">Sweep</a>
       </nav>
     </header>
+
     <section>
+      <p>Sweep through different attack sizes to find the best amount of units to attack with</p>
       <div> 
-        <form autocomplete="off" name="calcForm" hx-post="/submit" hx-target="#result">
+        <form autocomplete="off" name="calcForm" hx-post="/sweep_submit" hx-target="#result">
           <!-- <label for="title">Calculator</label><br> -->
 
-          <label for="attack">Attacking Strength</label><br>
-          <input type="text" id="attack" name="attack"><br>
           <label for="path">Path of units to attack</label><br>
           <input type="text" id="path" name="path"><br>
 

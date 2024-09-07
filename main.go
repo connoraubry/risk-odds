@@ -33,7 +33,8 @@ type Result struct {
 	Odds       float64
 }
 
-var resultTable map[int]map[int][]Result = make(map[int]map[int][]Result)
+// a -> d -> a_left -> float
+var resultTable map[int]map[int]map[int]float64
 
 var oddsLookupTable = map[int]map[int][]Odd{
 	1: {
@@ -70,8 +71,12 @@ var oddsLookupTable = map[int]map[int][]Odd{
 	},
 }
 
+// func newGetOdds(A_str, D_str int) []Odd {
+//
+// }
+
 var (
-	f_mode       = flag.String("mode", "base", "Mode to run tool in. ['base', 'path']")
+	f_mode       = flag.String("mode", "base", "Mode to run tool in. ['base', 'path', 'sweep', 'test']")
 	f_list       = flag.String("path", "1", "Comma separated path of enemies to go through (Ex. 1; 1,2,1; 1,4,12,3)")
 	f_strength   = flag.Int("strength", 3, "Strength of units to attack with.")
 	f_num        = flag.Int64("num", num_iter, "Iterations to do")
@@ -101,38 +106,134 @@ func main() {
 		path := ParsePath(*f_list)
 		Sweep(path)
 	case "test":
-		res := OddsTest(2, 1)
-		fmt.Println(res)
+		t := SingleOdds(2, 1, 1)
+		fmt.Println(t)
+	case "podds":
+		path := ParsePath(*f_list)
+		res := PathOdds(*f_strength, path)
+		odds := CalculateWinPercent(res)
+		fmt.Printf("Success odds: %.2f%%\n", 100*odds)
 	}
 }
 
-func OddsTest(a, d int) []Result {
-
-	if _, ok := resultTable[a]; !ok {
-		resultTable[a] = make(map[int][]Result)
-	}
-	if d_result, ok := resultTable[a][d]; ok {
-		return d_result
-	}
-
-	//not pre computed
-	for _, odd := range DoLookup(a, d) {
-
-		newA := a - odd.A_loss
-		newD := d - odd.D_loss
-
-		newResult := Result{
-			AttackLeft: newA,
-			Odds:       odd.Odds,
+func CalculateWinPercent(v map[int]float64) float64 {
+	sum := 0.0
+	for val, odd := range v {
+		if val > 1 {
+			sum += odd
 		}
+	}
+	return sum
+}
 
-		if newD == 0 || newA == 0 {
-			resultTable[a][d] = append(resultTable[a][d], newResult)
+func init() {
+	resultTable = make(map[int]map[int]map[int]float64)
+}
+
+func ResLookup(A_start, D_start, A_end int) (float64, bool) {
+
+	if _, ok := resultTable[A_start]; !ok {
+		resultTable[A_start] = make(map[int]map[int]float64)
+	}
+	a_map := resultTable[A_start]
+	if _, ok := a_map[D_start]; !ok {
+		a_map[D_start] = make(map[int]float64)
+	}
+	d_map := a_map[D_start]
+	result, ok := d_map[A_end]
+	return result, ok
+}
+
+func ResSave(A_start, D_start, A_end int, value float64) {
+
+	if _, ok := resultTable[A_start]; !ok {
+		resultTable[A_start] = make(map[int]map[int]float64)
+	}
+	a_map := resultTable[A_start]
+	if _, ok := a_map[D_start]; !ok {
+		a_map[D_start] = make(map[int]float64)
+	}
+	d_map := a_map[D_start]
+	d_map[A_end] = value
+}
+
+func PathOdds(A_start int, path []int) map[int]float64 {
+
+	//previous odds are likelihood that we'll get to current node
+	prevOdds := make(map[int]float64)
+	prevOdds[A_start] = 1
+
+	//run through the path
+	for _, entry := range path {
+		newOdds := make(map[int]float64)
+
+		//for every starting position in the previous odds,
+		// new odds
+		for a_start, perct := range prevOdds {
+			for a_end, o := range FullOdds(a_start, entry) {
+				newOdds[a_end-1] += perct * o
+			}
 		}
-
+		prevOdds = newOdds
 	}
 
-	return resultTable[a][d]
+	return prevOdds
+}
+
+// with battle A_start vs D_start, what are the odds it
+// ends with A_End
+func SingleOdds(A_start, D_start, A_End int) float64 {
+
+	if A_End > A_start {
+		return 0
+	}
+	if D_start == 0 {
+		if A_End == A_start {
+			return 1
+		}
+		return 0
+	}
+
+	//if not ok, it's not saved yet
+	if precompute, ok := ResLookup(A_start, D_start, A_End); ok {
+		return precompute
+	}
+
+	var odds float64 = 0
+	for _, result := range DoLookup(A_start, D_start) {
+		newA := A_start - result.A_loss
+		newD := D_start - result.D_loss
+		odds += (result.Odds * SingleOdds(newA, newD, A_End))
+	}
+
+	ResSave(A_start, D_start, A_End, odds)
+	return odds
+
+}
+
+func FullOdds(A_start, D_start int) map[int]float64 {
+	res := make(map[int]float64)
+
+	for i := A_start; i > 0; i-- {
+		odds := SingleOdds(A_start, D_start, i)
+
+		//odds greater than 1 in 10 million, add
+		if odds > float64(1.0/10000000) {
+			res[i] = odds
+		}
+	}
+	return res
+}
+
+func OddsTest(A_start, D_start int) {
+	var running float64 = 0
+	for i := A_start; i > 0; i-- {
+		odds := SingleOdds(A_start, D_start, i)
+
+		fmt.Printf("  %v: %v\n", i, odds)
+		running += odds
+	}
+	fmt.Printf("%.4f percent chance of victory\n", 100*running)
 }
 
 func DoLookup(a, d int) []Odd {
@@ -198,6 +299,39 @@ func PrintMapResult(res map[int]int) {
 		val := res[key]
 		percent := (100 * float64(val)) / float64(totalVal)
 		fmt.Printf("%v left: (%7d)  %-3.2f%%\n", key, val, percent)
+	}
+}
+
+func NewSweep(path []int) map[int]float64 {
+	pathSum := 0
+	for _, entry := range path {
+		pathSum += entry
+	}
+	sweepStart := len(path) + 1
+	sweepEnd := len(path) + (2 * pathSum) + 1
+	sweepResults := make(map[int]float64)
+	for i := sweepStart; i < sweepEnd; i++ {
+
+		res := PathOdds(i, path)
+		odds := CalculateWinPercent(res)
+		sweepResults[i] = odds
+	}
+	return sweepResults
+}
+
+func QuietSweep(path []int) {
+	pathSum := 0
+	for _, entry := range path {
+		pathSum += entry
+	}
+	sweepStart := len(path) + 1
+	sweepEnd := len(path) + (2 * pathSum) + 1
+	for i := sweepStart; i < sweepEnd; i++ {
+		res := RunPathSilent(i, path)
+		odds := res.GetSuccessOdds()
+		if odds > 99.0 {
+			break
+		}
 	}
 }
 
@@ -367,6 +501,16 @@ func roll_dice(n int) []int {
 	return dice
 }
 
+func roll_dice_faster(n int) []int {
+	dice := make([]int, 3)
+	for i := 0; i < n; i++ {
+		dice[i] = rand.Intn(6) + 1
+	}
+	slices.Sort(dice)
+	slices.Reverse(dice)
+	return dice
+}
+
 func attackTilDead(attacking, defending int, dice_fn diceroll_fn) (int, int) {
 
 	for attacking > 1 && defending > 0 {
@@ -398,13 +542,69 @@ func attack_fast(attacking, defending int) (int, int) {
 	lastOdd := odds[len(odds)-1]
 
 	return attacking - lastOdd.A_loss, defending - lastOdd.D_loss
-
 }
 func attack(attacking, defending int, diceroll diceroll_fn) (int, int) {
 	a_dice := diceroll(attacking)
 	d_dice := diceroll(defending)
 
 	return getNewValues(attacking, defending, a_dice, d_dice)
+}
+
+var oddsLookupTableFast = [][][]Odd{
+	{},
+	{
+		{},
+		{
+			Odd{A_loss: 0, D_loss: 1, Odds: 15.0 / 36.0},
+			Odd{A_loss: 1, D_loss: 0, Odds: 21.0 / 36.0},
+		},
+		{
+			Odd{A_loss: 0, D_loss: 1, Odds: 55.0 / 216.0},
+			Odd{A_loss: 1, D_loss: 0, Odds: 161.0 / 216.0},
+		},
+	},
+	{
+		{},
+		{
+			Odd{A_loss: 0, D_loss: 1, Odds: 125.0 / 216.0},
+			Odd{A_loss: 1, D_loss: 0, Odds: 91.0 / 216.0},
+		},
+		{
+			Odd{A_loss: 0, D_loss: 2, Odds: 295.0 / 1296.0},
+			Odd{A_loss: 1, D_loss: 1, Odds: 420.0 / 1296.0},
+			Odd{A_loss: 2, D_loss: 0, Odds: 581.0 / 1296.0},
+		},
+	},
+	{
+		{},
+		{
+			Odd{A_loss: 0, D_loss: 1, Odds: 855.0 / 1296.0},
+			Odd{A_loss: 1, D_loss: 0, Odds: 441.0 / 1296.0},
+		},
+		{
+			Odd{A_loss: 0, D_loss: 2, Odds: 2890.0 / 7776.0},
+			Odd{A_loss: 1, D_loss: 1, Odds: 2611.0 / 7776.0},
+			Odd{A_loss: 2, D_loss: 0, Odds: 2275.0 / 7776.0},
+		},
+	},
+}
+
+func attack_fast2(attacking, defending int) (int, int) {
+	odds := oddsLookupTableFast[attacking][defending]
+
+	n := rand.Float64()
+	for _, odd := range odds {
+
+		if n < odd.Odds {
+			return attacking - odd.A_loss, defending - odd.D_loss
+		}
+		n -= odd.Odds
+
+	}
+
+	lastOdd := odds[len(odds)-1]
+
+	return attacking - lastOdd.A_loss, defending - lastOdd.D_loss
 }
 
 func Min(x, y int) int {

@@ -119,7 +119,7 @@ func BenchmarkSortFunction(b *testing.B) {
 
 func TestAttackFast(t *testing.T) {
 	d_results := make(map[int]int)
-	total := 100000
+	total := 1000000
 	for i := 0; i < total; i++ {
 		new_a, new_d := attack_fast(3, 2)
 		if new_a+new_d != 3 {
@@ -146,6 +146,9 @@ func TestAttackFast(t *testing.T) {
 	}
 }
 
+// func TestOddsTest(t *testing.T) {
+// }
+
 func BenchmarkAttack(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		a_val := rand.Intn(3) + 1
@@ -160,4 +163,136 @@ func BenchmarkFastAttack(b *testing.B) {
 		d_val := rand.Intn(2) + 1
 		attack_fast(a_val, d_val)
 	}
+}
+
+func BenchmarkExtraFastAttack(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a_val := rand.Intn(3) + 1
+		d_val := rand.Intn(2) + 1
+		attack_fast2(a_val, d_val)
+	}
+
+}
+
+func BenchmarkRollDice(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		n_val := rand.Intn(3) + 1
+		roll_dice(n_val)
+	}
+}
+func BenchmarkRollDiceFast(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		n_val := rand.Intn(3) + 1
+		roll_dice_faster(n_val)
+	}
+}
+
+func BenchmarkOddsOld(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		RunPathSilent(7, []int{2})
+	}
+}
+func BenchmarkOddsNew(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		OddsTest(7, 2)
+	}
+}
+
+func TestFullOdds(t *testing.T) {
+
+	var data = []struct {
+		Start  int
+		End    int
+		Margin float64
+	}{
+		{Start: 6, End: 3, Margin: .005},
+		{Start: 12, End: 5, Margin: .01},
+		{Start: 4, End: 5, Margin: .01},
+		{Start: 21, End: 8, Margin: .01},
+	}
+
+	for _, entry := range data {
+		start := entry.Start
+		end := entry.End
+		margin := entry.Margin
+
+		fo := FullOdds(start, end)
+
+		old := RunPathSilent(start, []int{end})
+		monte := old.AttackResult[0]
+		total_v := 0
+		for _, value := range monte {
+			total_v += value
+		}
+
+		error_margin := margin
+
+		for odd, value := range fo {
+			monte_value := float64(monte[odd]) / float64(total_v)
+
+			if value-error_margin > monte_value || value+error_margin < monte_value {
+				t.Errorf("Error with odd %v: Got %.4f expected %.4f", odd, value, monte_value)
+			}
+		}
+	}
+
+}
+func TestOddsPath(t *testing.T) {
+
+	var data = []struct {
+		Start int
+		Path  []int
+
+		Margin float64
+	}{
+		{Start: 6, Path: []int{3}, Margin: .005},
+		{Start: 12, Path: []int{3, 1, 1}, Margin: .01},
+		{Start: 4, Path: []int{5}, Margin: .01},
+		{Start: 21, Path: []int{4, 5, 1}, Margin: .01},
+	}
+
+	for _, entry := range data {
+		start := entry.Start
+		path := entry.Path
+		margin := entry.Margin
+
+		new_res := PathOdds(start, path)
+		new_odds := CalculateWinPercent(new_res)
+
+		old := RunPathSilent(start, path)
+		old_odds := old.GetSuccessOdds()
+		new_odds *= 100.0
+		margin *= 100.0
+
+		if new_odds-margin > old_odds || new_odds+margin < old_odds {
+			t.Errorf("Error with obj %+v: Got %.4f expected %.4f", entry, new_odds, old_odds)
+		}
+	}
+}
+
+func BenchmarkOldPath(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		start, path := makeRandomStartAndPath()
+		RunPathSilent(start, path)
+	}
+}
+
+func BenchmarkNewPath(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		start, path := makeRandomStartAndPath()
+		PathOdds(start, path)
+	}
+}
+
+func makeRandomStartAndPath() (int, []int) {
+	start := rand.Intn(15) + 1
+	lenPath := rand.Intn(5) + 1
+	var path []int
+
+	for i := 0; i < lenPath; i++ {
+		path = append(path, rand.Intn(3)+1)
+	}
+
+	return start, path
 }
