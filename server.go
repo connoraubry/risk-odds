@@ -200,7 +200,8 @@ func ParsePathForm(pathForm []string) ([]int, error) {
 		if val == "" {
 			continue
 		}
-		intVal, err := strconv.Atoi(val)
+		newVal := strings.TrimSpace(val)
+		intVal, err := strconv.Atoi(newVal)
 		if err != nil {
 			return path, fmt.Errorf("Error parsing %v as an int", val)
 		}
