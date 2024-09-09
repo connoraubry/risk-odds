@@ -119,7 +119,7 @@ func main() {
 func CalculateWinPercent(v map[int]float64) float64 {
 	sum := 0.0
 	for val, odd := range v {
-		if val > 1 {
+		if val > 0 {
 			sum += odd
 		}
 	}
